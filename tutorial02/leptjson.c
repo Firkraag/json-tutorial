@@ -8,6 +8,102 @@ typedef struct {
     const char* json;
 }lept_context;
 
+char *parse_negative(char *string)
+{
+    if ( string[0] == '-')
+        return string + 1;
+    else
+        return string;
+}
+
+char *parse_int(char *string)
+{
+    if ( string[0] == '\0') {
+        return NULL;
+    }
+    else if ( string[0] == '0') {
+        return string + 1;
+    }
+    else if ( string[0] >= '1' && string[0] <= '9') {
+        string++;
+        while (string[0] >= '0' && string[0] <= '9') {
+            string++;
+        }
+        return string;
+    }
+    else {
+        return NULL;
+    }
+
+}
+
+char *parse_frac(char *string) {
+    int c;
+    if ( *string == '.')
+    {
+        string++;
+        if ( (c = *string) >= '0' && c <= '9')
+        {
+            while((c = *string) >= '0' && c == '9')
+            {
+                string++;
+            }
+            return string;
+        }
+        else {
+            return NULL;
+        }
+    }
+    else {
+        return string;
+    }
+}
+
+char *parse_exp(char *string) {
+    int c;
+    if ( (c = *string ) == 'e' || c == 'E') {
+        string++;
+        if ( *string == '\0')
+            return NULL;
+        if ( (c = *string) == '-' || c == '+') {
+            string++;
+        }
+        if ( *string == '\0')
+            return NULL;
+        
+        if ((c = *string) >= '0' && c <= '9')
+        {
+            while ((c = *string) >= '0' && c <= '9')
+                string++;
+            return string;
+        }
+        else {
+            return NULL;
+        }
+    }
+    else {
+        return string;
+        }
+}
+
+int is_numeric(char *string)
+{
+    if ( string[0] == '\0')
+        return 0;
+    string = parse_negative(string);
+    string = parse_int(string);
+    if ( string == NULL)
+        return 0;
+    string = parse_frac(string);
+    if ( string == NULL)
+        return 0;
+    string = parse_exp(string);
+    if ( string == NULL)
+        return 0;
+    return 1;
+
+
+}
 static void lept_parse_whitespace(lept_context* c) {
     const char *p = c->json;
     while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')
@@ -45,6 +141,9 @@ static int lept_parse_null(lept_context* c, lept_value* v) {
 static int lept_parse_number(lept_context* c, lept_value* v) {
     char* end;
     /* \TODO validate number */
+    char *cptr = c->json;
+    if (!is_numeric(cptr))
+        return LEPT_PARSE_INVALID_VALUE;
     v->n = strtod(c->json, &end);
     if (c->json == end)
         return LEPT_PARSE_INVALID_VALUE;
@@ -89,3 +188,4 @@ double lept_get_number(const lept_value* v) {
     assert(v != NULL && v->type == LEPT_NUMBER);
     return v->n;
 }
+
