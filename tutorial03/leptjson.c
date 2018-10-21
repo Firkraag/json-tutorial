@@ -93,7 +93,6 @@ static int lept_parse_string(lept_context* c, lept_value* v) {
     p = c->json;
     for (;;) {
         char ch = *p++;
-        unsigned uch = ch;
         if ( ch == '\"')
         {
                 len = c->top - head;
@@ -101,7 +100,7 @@ static int lept_parse_string(lept_context* c, lept_value* v) {
                 c->json = p;
                 return LEPT_PARSE_OK;
         }
-        else if ( ch == '\\')
+        else if (ch == '\\')
         {
                 switch (*p++) {
                     case '"': 
@@ -128,9 +127,11 @@ static int lept_parse_string(lept_context* c, lept_value* v) {
                     case 't':
                         PUTC(c, '\t');
                         break;
-                    case '\0':
-                        return LEPT_PARSE_MISS_QUOTATION_MARK;
+                    /*case '\0':*/
+                        /*c->top = head;*/
+                        /*return LEPT_PARSE_MISS_QUOTATION_MARK;*/
                     default:
+                        c->top = head;
                         return LEPT_PARSE_INVALID_STRING_ESCAPE;
                 }
         }
@@ -139,8 +140,9 @@ static int lept_parse_string(lept_context* c, lept_value* v) {
                 c->top = head;
                 return LEPT_PARSE_MISS_QUOTATION_MARK;
         }
-        else if ( uch < 0x20 || uch == 0x22 || uch == 0x5c)
+        else if ( (unsigned char) ch < 0x20 )
         {
+            c->top = head;
             return LEPT_PARSE_INVALID_STRING_CHAR;
         }
         else { 
@@ -154,9 +156,9 @@ static int lept_parse_value(lept_context* c, lept_value* v) {
         case 't':  return lept_parse_literal(c, v, "true", LEPT_TRUE);
         case 'f':  return lept_parse_literal(c, v, "false", LEPT_FALSE);
         case 'n':  return lept_parse_literal(c, v, "null", LEPT_NULL);
-        default:   return lept_parse_number(c, v);
         case '"':  return lept_parse_string(c, v);
         case '\0': return LEPT_PARSE_EXPECT_VALUE;
+        default:   return lept_parse_number(c, v);
     }
 }
 
