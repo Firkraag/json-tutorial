@@ -90,13 +90,68 @@ static int lept_parse_number(lept_context* c, lept_value* v) {
     return LEPT_PARSE_OK;
 }
 
+
+/*static int is_valid_hex_charater(unsigned char c) {*/
+    /*if ((c >= 'A' && c <= 'F') || (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))*/
+        /*return 1;*/
+    /*else*/
+        /*return 0;*/
+/*}*/
+
+static const char* str2hex(const char *p, unsigned *u, int length) {
+    int i;
+    unsigned sum = 0;
+    unsigned power = 1;
+    assert(length >= 0);
+    for (i = length - 1; i >= 0; i--)
+    {
+        unsigned c = *(p + i);
+        if (c >= 'A' && c <= 'F') 
+        {
+            sum += (c - 'A' + 10) * power;
+        }
+        else if (c >= '0' && c <= '9')
+        {
+            sum += (c - '0') * power;
+        }
+        else if (c >= 'a' && c <= 'f')
+        {
+            sum += (c - 'a' + 10) * power;
+        }
+        else {
+            return NULL;
+        }
+        power *= 16;
+    }
+    *u = sum;
+    return p + length;
+}
+
+
 static const char* lept_parse_hex4(const char* p, unsigned* u) {
-    /* \TODO */
-    return p;
+    return str2hex(p, u, 4);
 }
 
 static void lept_encode_utf8(lept_context* c, unsigned u) {
-    /* \TODO */
+    assert(u <= 0x10ffff);
+    if (u <= 0x007f) {
+        PUTC(c, u);
+    }
+    else if ( u >= 0x0080 && u <= 0x07ff) {
+        PUTC(c, 0xc0 | ((u >> 6) & 0x1f));
+        PUTC(c, 0x80 | (u & 0x3f));
+    }
+    else if ( u >= 0x0800 && u <= 0xffff) {
+        PUTC(c, 0xE0 | ((u >> 12) & 0xFF)); /* 0xE0 = 11100000 */
+        PUTC(c, 0x80 | ((u >>  6) & 0x3F)); /* 0x80 = 10000000 */
+        PUTC(c, 0x80 | ( u        & 0x3F)); /* 0x3F = 00111111 */
+    }
+    else {
+        PUTC(c, 0xf0 | ((u >> 18) & 0x03));
+        PUTC(c, 0x80 | ((u >> 12) & 0x3f));
+        PUTC(c, 0x80 | ((u >> 6) & 0x3f));
+        PUTC(c, 0x80 | ( u        & 0x3F)); /* 0x3F = 00111111 */
+    }
 }
 
 #define STRING_ERROR(ret) do { c->top = head; return ret; } while(0)
@@ -105,6 +160,7 @@ static int lept_parse_string(lept_context* c, lept_value* v) {
     size_t head = c->top, len;
     unsigned u;
     const char* p;
+    unsigned low;
     EXPECT(c, '\"');
     p = c->json;
     for (;;) {
@@ -127,7 +183,21 @@ static int lept_parse_string(lept_context* c, lept_value* v) {
                     case 't':  PUTC(c, '\t'); break;
                     case 'u':
                         if (!(p = lept_parse_hex4(p, &u)))
-                            STRING_ERROR(LEPT_PARSE_INVALID_UNICODE_HEX);
+                         STRING_ERROR(LEPT_PARSE_INVALID_UNICODE_HEX);
+                        if ( u >= 0xd800 && u <= 0xdbff)
+                        {
+                            if ( *p++ != '\\' || *p++ != 'u')
+                                STRING_ERROR(LEPT_PARSE_INVALID_UNICODE_SURROGATE);
+                            if ( !(p = lept_parse_hex4(p, &low)))
+                                STRING_ERROR(LEPT_PARSE_INVALID_UNICODE_HEX);
+                            if ( low >= 0xdc00 && low <= 0xdfff)
+                                u = 0x10000 + (u - 0xD800) * 0x400 + (low - 0xDC00);
+                            else
+                                STRING_ERROR(LEPT_PARSE_INVALID_UNICODE_SURROGATE);
+                        }
+
+
+                                
                         /* \TODO surrogate handling */
                         lept_encode_utf8(c, u);
                         break;
